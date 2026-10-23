@@ -35,10 +35,19 @@ pub const DEFAULT_BASE_URL: &str = "https://witan.markets";
 #[derive(Debug)]
 pub enum Error {
     /// A non-2xx answer: the status, the server's message and the body as sent.
-    Api { status: u16, message: String, body: String },
+    Api {
+        status: u16,
+        message: String,
+        body: String,
+    },
     /// A 402: a priced unit or a paid dataset version not yet bought, or a quota exceeded. `pay` is the
     /// x402 URL to buy it at and `price` the amount; `free_with_key` says an agent key reads it free.
-    PaymentRequired { message: String, price: Option<String>, pay: Option<String>, free_with_key: bool },
+    PaymentRequired {
+        message: String,
+        price: Option<String>,
+        pay: Option<String>,
+        free_with_key: bool,
+    },
     /// The request did not complete (network, TLS, timeout).
     Http(reqwest::Error),
     /// The answer was not the JSON expected.
@@ -48,8 +57,15 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::Api { status, message, .. } => write!(f, "witan: {status} {message}"),
-            Error::PaymentRequired { message, price, pay, .. } => match (price, pay) {
+            Error::Api {
+                status, message, ..
+            } => write!(f, "witan: {status} {message}"),
+            Error::PaymentRequired {
+                message,
+                price,
+                pay,
+                ..
+            } => match (price, pay) {
                 (Some(p), Some(u)) => write!(f, "witan: 402 {message} (pay {p} at {u})"),
                 _ => write!(f, "witan: 402 {message}"),
             },
@@ -123,7 +139,12 @@ impl ClientBuilder {
             .timeout(self.timeout)
             .build()
             .map_err(Error::Http)?;
-        Ok(Client { http, base_url: self.base_url, api_key: self.api_key.filter(|k| !k.is_empty()), retries: self.retries })
+        Ok(Client {
+            http,
+            base_url: self.base_url,
+            api_key: self.api_key.filter(|k| !k.is_empty()),
+            retries: self.retries,
+        })
     }
 }
 
@@ -148,7 +169,9 @@ impl Client {
     /// # Panics
     /// When the TLS backend cannot start; [`Client::builder`] returns that as an error instead.
     pub fn new() -> Self {
-        Self::builder().build().expect("witan: building the HTTP client")
+        Self::builder()
+            .build()
+            .expect("witan: building the HTTP client")
     }
 
     /// A builder with the defaults and the environment applied.
@@ -171,7 +194,11 @@ impl Client {
     /// to 4,000 characters). The server reduces it to its signature and matches the same signature, then
     /// the same shape, then a close one; `matched.kind` on each hit says which. Sent in a POST body,
     /// never in a URL; only the signature is kept. Public.
-    pub async fn search_error(&self, error: &str, opts: Option<ErrorSearchOptions>) -> Result<ErrorSearchAnswer, Error> {
+    pub async fn search_error(
+        &self,
+        error: &str,
+        opts: Option<ErrorSearchOptions>,
+    ) -> Result<ErrorSearchAnswer, Error> {
         let o = opts.unwrap_or_default();
         let mut body = json!({ "error": error });
         if let Some(c) = o.category {
@@ -180,12 +207,17 @@ impl Client {
         if let Some(l) = o.limit {
             body["limit"] = json!(l);
         }
-        self.send(reqwest::Method::POST, "/search/error", &[], Some(body)).await
+        self.send(reqwest::Method::POST, "/search/error", &[], Some(body))
+            .await
     }
 
     /// Published units that hold every word of `q`, else the closest by meaning that are close enough.
     /// An empty `q` lists the newest. Public.
-    pub async fn search(&self, q: &str, opts: Option<SearchOptions>) -> Result<Vec<SearchHit>, Error> {
+    pub async fn search(
+        &self,
+        q: &str,
+        opts: Option<SearchOptions>,
+    ) -> Result<Vec<SearchHit>, Error> {
         let o = opts.unwrap_or_default();
         let mut query: Vec<(&str, String)> = Vec::new();
         if !q.is_empty() {
@@ -205,7 +237,9 @@ impl Client {
             #[serde(default)]
             results: Vec<SearchHit>,
         }
-        let a: Answer = self.send(reqwest::Method::GET, "/search", &query, None).await?;
+        let a: Answer = self
+            .send(reqwest::Method::GET, "/search", &query, None)
+            .await?;
         Ok(a.results)
     }
 
@@ -213,7 +247,13 @@ impl Client {
     /// reads free with an agent key; a priced one needs a key that has bought it. Otherwise
     /// [`Error::PaymentRequired`] says the price and where to pay.
     pub async fn read(&self, id: &str) -> Result<KnowledgeUnit, Error> {
-        self.send(reqwest::Method::GET, &format!("/knowledge/{}/full", seg(id)), &[], None).await
+        self.send(
+            reqwest::Method::GET,
+            &format!("/knowledge/{}/full", seg(id)),
+            &[],
+            None,
+        )
+        .await
     }
 
     /// The public dataset projects.
@@ -223,17 +263,31 @@ impl Client {
             #[serde(default)]
             projects: Vec<Project>,
         }
-        let a: Answer = self.send(reqwest::Method::GET, "/projects", &[], None).await?;
+        let a: Answer = self
+            .send(reqwest::Method::GET, "/projects", &[], None)
+            .await?;
         Ok(a.projects)
     }
 
     /// One project: its readme, schema, versions and contributors. Public.
     pub async fn dataset(&self, slug: &str) -> Result<ProjectDetail, Error> {
-        self.send(reqwest::Method::GET, &format!("/projects/{}", seg(slug)), &[], None).await
+        self.send(
+            reqwest::Method::GET,
+            &format!("/projects/{}", seg(slug)),
+            &[],
+            None,
+        )
+        .await
     }
 
     /// A page of a version's records (the latest when `version` is `None`). Needs a key.
-    pub async fn dataset_data(&self, slug: &str, version: Option<u32>, limit: Option<u32>, offset: Option<u64>) -> Result<DataPage, Error> {
+    pub async fn dataset_data(
+        &self,
+        slug: &str,
+        version: Option<u32>,
+        limit: Option<u32>,
+        offset: Option<u64>,
+    ) -> Result<DataPage, Error> {
         let mut q: Vec<(&str, String)> = Vec::new();
         if let Some(v) = version {
             q.push(("version", v.to_string()));
@@ -244,12 +298,24 @@ impl Client {
         if let Some(o) = offset {
             q.push(("offset", o.to_string()));
         }
-        self.send(reqwest::Method::GET, &format!("/projects/{}/data", seg(slug)), &q, None).await
+        self.send(
+            reqwest::Method::GET,
+            &format!("/projects/{}/data", seg(slug)),
+            &q,
+            None,
+        )
+        .await
     }
 
     /// Read-only SQL over a version on the server; the table is named `data`. Needs a key; the size of
     /// the result counts as egress.
-    pub async fn query(&self, slug: &str, sql: &str, version: Option<u32>, limit: Option<u32>) -> Result<QueryResult, Error> {
+    pub async fn query(
+        &self,
+        slug: &str,
+        sql: &str,
+        version: Option<u32>,
+        limit: Option<u32>,
+    ) -> Result<QueryResult, Error> {
         let mut body = json!({ "sql": sql });
         if let Some(v) = version {
             body["version"] = json!(v);
@@ -257,7 +323,13 @@ impl Client {
         if let Some(l) = limit {
             body["limit"] = json!(l);
         }
-        self.send(reqwest::Method::POST, &format!("/projects/{}/query", seg(slug)), &[], Some(body)).await
+        self.send(
+            reqwest::Method::POST,
+            &format!("/projects/{}/query", seg(slug)),
+            &[],
+            Some(body),
+        )
+        .await
     }
 
     /// What the key's operator has used and has left this month. Needs a key.
@@ -272,11 +344,20 @@ impl Client {
 
     // One request, retrying network errors and 429/502/503/504. Every route this client calls is a read
     // or an idempotent search, so retrying is safe.
-    async fn send<T: DeserializeOwned>(&self, method: reqwest::Method, path: &str, query: &[(&str, String)], body: Option<Value>) -> Result<T, Error> {
+    async fn send<T: DeserializeOwned>(
+        &self,
+        method: reqwest::Method,
+        path: &str,
+        query: &[(&str, String)],
+        body: Option<Value>,
+    ) -> Result<T, Error> {
         let url = format!("{}{}", self.base_url, path);
         let mut attempt: u32 = 0;
         loop {
-            let mut req = self.http.request(method.clone(), &url).header("accept", "application/json");
+            let mut req = self
+                .http
+                .request(method.clone(), &url)
+                .header("accept", "application/json");
             if !query.is_empty() {
                 req = req.query(query);
             }
@@ -297,7 +378,11 @@ impl Client {
             };
             let status = res.status().as_u16();
             if matches!(status, 429 | 502 | 503 | 504) && attempt < self.retries {
-                let ra = res.headers().get("retry-after").and_then(|v| v.to_str().ok()).map(str::to_string);
+                let ra = res
+                    .headers()
+                    .get("retry-after")
+                    .and_then(|v| v.to_str().ok())
+                    .map(str::to_string);
                 tokio::time::sleep(backoff(attempt, ra.as_deref())).await;
                 attempt += 1;
                 continue;
@@ -322,10 +407,18 @@ fn api_error(status: u16, body: String) -> Error {
     let v: Value = serde_json::from_str(&body).unwrap_or(Value::Null);
     let message = match &v["error"] {
         Value::String(s) if !s.is_empty() => s.clone(),
-        Value::Object(o) => o.get("message").and_then(Value::as_str).unwrap_or("").to_string(),
+        Value::Object(o) => o
+            .get("message")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string(),
         _ => String::new(),
     };
-    let message = if message.is_empty() { format!("HTTP {status}") } else { message };
+    let message = if message.is_empty() {
+        format!("HTTP {status}")
+    } else {
+        message
+    };
     if status == 402 {
         return Error::PaymentRequired {
             message,
@@ -334,14 +427,20 @@ fn api_error(status: u16, body: String) -> Error {
             free_with_key: v["freeWithKey"].as_bool().unwrap_or(false),
         };
     }
-    Error::Api { status, message, body }
+    Error::Api {
+        status,
+        message,
+        body,
+    }
 }
 
 // a path segment: everything but unreserved characters escaped, so a slug or id stays one segment
 fn seg(s: &str) -> String {
     s.bytes()
         .map(|b| match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => (b as char).to_string(),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                (b as char).to_string()
+            }
             _ => format!("%{b:02X}"),
         })
         .collect()

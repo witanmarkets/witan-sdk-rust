@@ -2,7 +2,7 @@
 name = "witan-sdk"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.88"
 description = "Rust client for WITAN: search can't find it, agents buy it here. Search errors, read measured units, query datasets."
 license = "MIT"
 repository = "https://github.com/witanmarkets/witan-sdk-rust"

@@ -1,9 +1,14 @@
-use witan_sdk::{Client, Error, ErrorSearchOptions, SearchOptions};
 use wiremock::matchers::{body_json, header, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
+use witan_sdk::{Client, Error, ErrorSearchOptions, SearchOptions};
 
 fn client(server: &MockServer) -> Client {
-    Client::builder().base_url(server.uri()).api_key("").retries(2).build().unwrap()
+    Client::builder()
+        .base_url(server.uri())
+        .api_key("")
+        .retries(2)
+        .build()
+        .unwrap()
 }
 
 #[tokio::test]
@@ -18,7 +23,16 @@ async fn search_error_sends_the_error_in_the_body() {
         ))
         .mount(&s)
         .await;
-    let a = client(&s).search_error("npm error code ENEEDAUTH", Some(ErrorSearchOptions { limit: Some(3), ..Default::default() })).await.unwrap();
+    let a = client(&s)
+        .search_error(
+            "npm error code ENEEDAUTH",
+            Some(ErrorSearchOptions {
+                limit: Some(3),
+                ..Default::default()
+            }),
+        )
+        .await
+        .unwrap();
     let h = &a.results[0];
     assert_eq!(h.id, "u1");
     assert_eq!(h.score, Some(78.0));
@@ -34,11 +48,27 @@ async fn search_sends_query_and_key() {
         .and(query_param("q", "redis throughput"))
         .and(query_param("mode", "keyword"))
         .and(header("authorization", "Bearer km_test"))
-        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"results":[{"id":"a","score":null},{"id":"b","score":73}]}"#))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string(r#"{"results":[{"id":"a","score":null},{"id":"b","score":73}]}"#),
+        )
         .mount(&s)
         .await;
-    let c = Client::builder().base_url(s.uri()).api_key("km_test").build().unwrap();
-    let hits = c.search("redis throughput", Some(SearchOptions { mode: Some("keyword".into()), ..Default::default() })).await.unwrap();
+    let c = Client::builder()
+        .base_url(s.uri())
+        .api_key("km_test")
+        .build()
+        .unwrap();
+    let hits = c
+        .search(
+            "redis throughput",
+            Some(SearchOptions {
+                mode: Some("keyword".into()),
+                ..Default::default()
+            }),
+        )
+        .await
+        .unwrap();
     assert_eq!(hits.len(), 2);
     assert_eq!(hits[0].score, None);
     assert_eq!(hits[1].score, Some(73.0));
@@ -52,7 +82,12 @@ async fn read_payment_required() {
         .mount(&s)
         .await;
     match client(&s).read("x").await {
-        Err(Error::PaymentRequired { price, pay, free_with_key, .. }) => {
+        Err(Error::PaymentRequired {
+            price,
+            pay,
+            free_with_key,
+            ..
+        }) => {
             assert_eq!(price.as_deref(), Some("$0.01"));
             assert!(pay.unwrap().contains("paid/knowledge"));
             assert!(free_with_key);
@@ -70,7 +105,9 @@ async fn retries_503_then_succeeds() {
         .mount(&s)
         .await;
     Mock::given(path("/knowledge/u1/full"))
-        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"id":"u1","title":"T","body":"B"}"#))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_string(r#"{"id":"u1","title":"T","body":"B"}"#),
+        )
         .mount(&s)
         .await;
     let u = client(&s).read("u1").await.unwrap();
@@ -81,7 +118,11 @@ async fn retries_503_then_succeeds() {
 async fn gives_up_after_retries_and_keeps_the_message() {
     let s = MockServer::start().await;
     Mock::given(path("/projects"))
-        .respond_with(ResponseTemplate::new(429).insert_header("retry-after", "0").set_body_string(r#"{"error":"slow down"}"#))
+        .respond_with(
+            ResponseTemplate::new(429)
+                .insert_header("retry-after", "0")
+                .set_body_string(r#"{"error":"slow down"}"#),
+        )
         .expect(3)
         .mount(&s)
         .await;
@@ -107,11 +148,19 @@ async fn query_body() {
     let s = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/projects/agent-api-observatory/query"))
-        .and(body_json(serde_json::json!({ "sql": "SELECT 1", "version": 79 })))
-        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"columns":["x"],"rows":[[1]],"count":1}"#))
+        .and(body_json(
+            serde_json::json!({ "sql": "SELECT 1", "version": 79 }),
+        ))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string(r#"{"columns":["x"],"rows":[[1]],"count":1}"#),
+        )
         .mount(&s)
         .await;
-    let q = client(&s).query("agent-api-observatory", "SELECT 1", Some(79), None).await.unwrap();
+    let q = client(&s)
+        .query("agent-api-observatory", "SELECT 1", Some(79), None)
+        .await
+        .unwrap();
     assert_eq!(q.columns, vec!["x"]);
     assert_eq!(q.count, 1);
 }
