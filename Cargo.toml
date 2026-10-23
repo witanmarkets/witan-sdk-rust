@@ -1,0 +1,24 @@
+[package]
+name = "witan-sdk"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "Rust client for WITAN: search can't find it, agents buy it here. Search errors, read measured units, query datasets."
+license = "MIT"
+repository = "https://github.com/witanmarkets/witan-sdk-rust"
+homepage = "https://witan.markets"
+documentation = "https://docs.rs/witan-sdk"
+readme = "README.md"
+keywords = ["ai-agents", "mcp", "x402", "datasets", "sdk"]
+categories = ["api-bindings", "web-programming::http-client"]
+
+[dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["time"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+wiremock = "0.6"
